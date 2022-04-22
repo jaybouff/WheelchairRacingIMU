@@ -424,12 +424,12 @@ end
 %     uiwait(msgbox('This message will pause execution until you click OK'));
 % end
 
-%%CHANGEMENTS
+%% CHANGEMENTS
 
 %Ici nous retrouvons les min et les max sur la courbe d'acceleration du
 %FRAME
-Variable.maximum.courbeacc.TouF.IMU= islocalmax(Table.Frame.AccelX.frotdata03LP, 1,'MinSeparation', tempsminimal*FzIMU,'FlatSelection', 'first');
-Variable.minimum.courbeacc.TouF.IMU = islocalmin(Table.Frame.AccelX.frotdata03LP, 1,'MinSeparation', tempsminimal*FzIMU,'FlatSelection', 'first');
+Variable.maximum.courbeacc.TouF.IMU= islocalmax(Table.Frame.AccelX.frotdata03LP, 1,'MinSeparation', tempsminimal*FzIMU,'MinProminence',0.05,'FlatSelection', 'first');
+Variable.minimum.courbeacc.TouF.IMU = islocalmin(Table.Frame.AccelX.frotdata03LP, 1,'MinSeparation', tempsminimal*FzIMU,'MinProminence',0.05,'FlatSelection', 'first');
 
 
 
@@ -459,10 +459,11 @@ for ivariable = 1:length(Variables)
 end 
 
 for ivariable = 1:length(Variables)
-    Variable.(Variables{ivariable}).courbeacc.TouFmod.SP = logical( Variable.(Variables{ivariable}).courbeacc.TouFmod.SP)
+    Variable.(Variables{ivariable}).courbeacc.TouFmod.SP = logical( Variable.(Variables{ivariable}).courbeacc.TouFmod.SP);
 end
 
-%Ici nous retrouvons les valeurs d'accel et de vitesse de ces maxs et de ces mins
+%Ici nous retrouvons les valeurs d'accel et de vitesse de ces maxs et de
+%ces mins pour les capteurs inertiels
 
 for ivariable = 1:length(Variables)
     for itrial=1:NombreEssai
@@ -482,6 +483,246 @@ for ivariable = 1:length(Variables)
         Variable.(Variables{ivariable}).courbevit.AccelBasedSpeed.SP(2:NombreDePousseesMax+1,itrial)=donnees(1:NombreDePousseesMax,1);
     end 
 end
+
+
+%Essayons de voir ce que cela ressemble sur graphique d'accélération
+for itrial = 1:NombreEssai 
+
+    clf
+
+    plot(Time(:,1),Table.Frame.AccelX.frotdata03LP(:,itrial), ...
+    Variable.minimum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial),  Variable.minimum.courbeacc.accel.IMU(2:NombreDePousseesMax+1,itrial),'b*',...
+    Variable.maximum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial), Variable.maximum.courbeacc.accel.IMU(2:NombreDePousseesMax+1,itrial),'r*')
+
+     uiwait(msgbox('Cliquer sur OK pour passer au prochain essai'));
+end
+
+%Essayons de voir ce que cela ressemble sur graphique de vitesse
+for itrial = 1:NombreEssai 
+
+    clf
+    subplot(2,1,1)
+    plot(TimeSPcut(:,1),Table.SciencePerfo.vitessekmh.fdata04LPcut(:,itrial), ...
+    Variable.minimum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial), Variable.minimum.courbevit.AccelBasedSpeed.SP(2:NombreDePousseesMax+1,itrial),'b*',...
+    Variable.maximum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial), Variable.maximum.courbevit.AccelBasedSpeed.SP(2:NombreDePousseesMax+1,itrial),'ro');
+
+
+    subplot(2,1,2)
+    plot(Time(:,1),Table.Frame.Vitessexkmh.frotdata03LP(:,itrial), ...
+    Variable.minimum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial),  Variable.minimum.courbevit.AccelBasedSpeed.IMU(2:NombreDePousseesMax+1,itrial),'b*',...
+    Variable.maximum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial), Variable.maximum.courbevit.AccelBasedSpeed.IMU(2:NombreDePousseesMax+1,itrial),'ro')
+
+     uiwait(msgbox('Cliquer sur OK pour passer au prochain essai'));
+end
+
+%% Déterminer les variables en fonction des données 
+% Durée d'une poussée
+
+
+for itrial=1:NombreEssai
+    Variable.PushTime.IMU.AccelBased.minimum(1:NombreDePousseesMax,itrial)=...
+    Variable.minimum.courbeacc.temps.IMU(2:NombreDePousseesMax+1,itrial) -...
+    Variable.minimum.courbeacc.temps.IMU(1:NombreDePousseesMax,itrial);
+end
+
+%Fréquence de poussée
+Variable.Frequence.Frame(1:NombreDePousseesMax,:)=Variable.PushTime.IMU.AccelBased.minimum(1:NombreDePousseesMax,:).^-1;
+
+% Gain de vitesse
+
+for isensor = 1:length(Sensor)
+    for itrial=1:NombreEssai
+        Variable.SpeedGain.(Sensor{isensor}).AccelBased.minimum(1:NombreDePousseesMax,itrial)=...
+        Variable.minimum.courbevit.AccelBasedSpeed.(Sensor{isensor})(2:NombreDePousseesMax+1,itrial) -...
+        Variable.minimum.courbevit.AccelBasedSpeed.(Sensor{isensor})(1:NombreDePousseesMax,itrial);
+    end
+end
+
+
+% Vitesse moyenne par poussée
+% Pour y arriver, il faut trouver la moyenne de la courbe entre deux mins ou deux maxs. 
+for isensor = 1:length(Sensor)
+    for itrial=1:NombreEssai
+        for ipoussee = 1:NombreDePousseesMax-1
+        
+            if isensor == 1
+                if (round(Variable.minimum.courbeacc.temps.IMU((ipoussee),itrial)*FzSP))==0
+                    debut_moyenne = 1;
+                else
+                    debut_moyenne = (round(Variable.minimum.courbeacc.temps.IMU((ipoussee),itrial)*FzSP));
+                end
+    
+                fin_moyenne = (round(Variable.minimum.courbeacc.temps.IMU((ipoussee+1),itrial)*FzSP));
+    
+                Variable.Mean.minimum.AccelBased.courbevit.(Sensor{isensor})(ipoussee,itrial) = ...
+                mean(Table.SciencePerfo.vitessekmh.fdata04LPcut(...
+                debut_moyenne:fin_moyenne,itrial));
+            elseif isensor == 2
+                if (round(Variable.minimum.courbeacc.temps.IMU((ipoussee),itrial)*FzIMU))==0
+                    debut_moyenne = 1;
+                else
+                    debut_moyenne = (round(Variable.minimum.courbeacc.temps.IMU((ipoussee),itrial)*FzIMU));
+                end
+    
+                fin_moyenne = (round(Variable.minimum.courbeacc.temps.IMU((ipoussee+1),itrial)*FzIMU));
+
+
+                Variable.Mean.minimum.AccelBased.courbevit.(Sensor{isensor})(ipoussee,itrial) = ...
+                mean(Table.Frame.Vitessexkmh.frotdata03LP(...
+                debut_moyenne:fin_moyenne,itrial));
+            end
+
+
+        end
+    end
+end
+
+
+%% A faire 
+% Min à Max
+
+
+for isensor = 1:length(Sensor)
+    for itrials = 1:NombreEssai
+        for ipoussee = 1:NombreDePousseesMax-1
+    
+            Variable.SpeedGain.AccelBased.(Sensor{isensor}).MinaMax(ipoussee,itrials)=...
+                Variable.maximum.courbevit.AccelBasedSpeed.(Sensor{isensor})((ipoussee),itrials)-...
+                Variable.minimum.courbevit.AccelBasedSpeed.(Sensor{isensor})(ipoussee,itrials);
+        end
+    end
+end
+
+
+% Max - prochain min
+
+ for isensor = 1:length(Sensor)
+    for itrials = 1:NombreEssai
+        for ipoussee = 1:NombreDePousseesMax-1
+    
+            Variable.SpeedGain.AccelBased.(Sensor{isensor}).MaxaMin(ipoussee,itrials)=...
+                Variable.maximum.courbevit.AccelBasedSpeed.(Sensor{isensor})(ipoussee,itrials)-...
+                Variable.minimum.courbevit.AccelBasedSpeed.(Sensor{isensor})((ipoussee+1),itrials);
+        end
+    end
+end
+
+
+
+%Gain de moyenne par poussée
+for isensor = 1:length(Sensor)
+    for itrials = 1:NombreEssai
+        for ipoussee = 1:NombreDePousseesMax-2
+    
+            Variable.SpeedGain.AccelBased.(Sensor{isensor}).MeanaMean.minimum(ipoussee,itrials)=...
+                Variable.Mean.minimum.AccelBased.courbevit.(Sensor{isensor})((ipoussee+1),itrials)-...
+                Variable.Mean.minimum.AccelBased.courbevit.(Sensor{isensor})(ipoussee,itrials);
+        end
+    end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% Travaillons maintenant avec les mains
+%Avec les normes issues des mains
+
+[Variable.maximum.pksdH, Variable.maximum.locsdH] = arrayfun(@(x) findpeaks(Variable.norme.dHand(:,x),'MinPeakProminence',MinPeakProminenceH),...
+    1:size(Variable.norme.dHand,2),'UniformOutput',false);
+
+[Variable.maximum.pksndH, Variable.maximum.locsndH] = arrayfun(@(x) findpeaks(Variable.norme.ndHand(:,x),'MinPeakProminence',MinPeakProminenceH),...
+    1:size(Variable.norme.ndHand,2),'UniformOutput',false);
+
+PushCyclendH = [Variable.maximum.locsndH; Variable.maximum.pksndH];
+
+for iPushCyclendH = 1:size(PushCyclendH,2)
+
+clf
+subplot(2,1,1)
+plot(Variable.maximum.locsdH{1, iPushCyclendH}, Variable.maximum.pksdH{1, iPushCyclendH}, 'og')
+hold on
+plot(Sample,Variable.norme.dHand(:,iPushCyclendH),'g')
+grid on
+ylabel('Acceleration dHand (g)')
+xlabel('Sample')
+
+subplot(2,1,2)
+plot(Variable.maximum.locsndH{1, (iPushCyclendH)}, Variable.maximum.pksndH{1, iPushCyclendH}, 'og')
+hold on
+plot(Sample,Variable.norme.ndHand(:,iPushCyclendH),'g')
+grid on
+ylabel('Acceleration ndHand (g)')
+xlabel('Sample') 
+
+%Le ginput sert à déterminer quels valeurs de peaks (ceux au dessus du seuil
+%choisis) sont celles qui sont utilisées pour l'identification des poussées
+[~,threshold_dH] = ginput(1); %Sélectionner le treshhold
+flocsdHand = find(Variable.maximum.pksdH{1, iPushCyclendH}>threshold_dH);%trouve la position des peaks en haut du treshold
+%Répéter pour l'autre main
+[~,threshold_ndH] = ginput(1); 
+flocsndHand = find(Variable.maximum.pksndH{1, iPushCyclendH}>threshold_ndH); 
+
+%Ici, considérant que la longueur de flocsdHand sera le nombre de poussée
+%x2, on ajuste le nombre de poussées effectué pour chaque essai
+if length(flocsdHand)<2*NombreDePousseesMax||length(flocsndHand)<2*NombreDePousseesMax
+    NombreDePoussees=min([floor(length(flocsdHand)/2),floor(length(flocsndHand)/2)]);
+else
+    NombreDePoussees=NombreDePousseesMax;
+end
+
+%Identifier une seule location de peak sur deux considérant que le elbow
+%ascending et elbow descending vont générer des accels maximales
+Everysecondpeakdata_dH(1:NombreDePoussees,iPushCyclendH) = flocsdHand(2:2:(2*NombreDePoussees),:);
+%Retrouver le Sample qui corresponds aux peaks identifiés
+Variable.StartPropulsion.dHand(2:NombreDePoussees+1,iPushCyclendH) = Variable.maximum.locsdH{1, iPushCyclendH}(Everysecondpeakdata_dH(1:NombreDePoussees,iPushCyclendH));
+
+%Même principe pour l'autre main
+Everysecondpeakdata_ndH(1:NombreDePoussees,iPushCyclendH)= flocsndHand(2:2:(2*NombreDePoussees),:);%Détermine le numéro des peaks 
+Variable.StartPropulsion.ndHand(2:NombreDePoussees+1,iPushCyclendH) = Variable.maximum.locsndH{1, iPushCyclendH}(Everysecondpeakdata_ndH(1:NombreDePoussees,iPushCyclendH));
+
+%Maintenant on trouve les pks maximaux
+Variable.CyclePeak.dHand(1:NombreDePoussees,iPushCyclendH) = Variable.maximum.pksdH{1, iPushCyclendH}(Everysecondpeakdata_dH(1:NombreDePoussees,iPushCyclendH));
+Variable.CyclePeak.ndHand(1:NombreDePoussees,iPushCyclendH) = Variable.maximum.pksndH{1, iPushCyclendH}(Everysecondpeakdata_ndH(1:NombreDePoussees,iPushCyclendH));
+
+end
+
+%%Données Spatio-temporelles des poussées (Fréquence/durée des poussées)
+Variable.PushTime.dHand(1:NombreDePoussees,:)= diff(Variable.StartPropulsion.dHand)/FzIMU; %%Déterminer le début des peaks de la ndHand
+Variable.Frequence.dHand(1:NombreDePoussees,:)=Variable.PushTime.dHand(1:NombreDePoussees,:).^-1;
+
+Variable.PushTime.ndHand(1:NombreDePoussees,:)= diff(Variable.StartPropulsion.ndHand)/FzIMU; %%Déterminer le début des peaks de la ndHand
+Variable.Frequence.ndHand(1:NombreDePoussees,:)=Variable.PushTime.ndHand(1:NombreDePoussees,:).^-1;
+
+%Calcul de symmétrie pour chaque poussée (ligne) et chaque trial
+%(colone)
+for iTrials = 1:size(Everysecondpeakdata_dH,2)
+    iPoussee = 1:size(Variable.CyclePeak.dHand,1);
+
+Variable.Symmetrie.OldAcc(iPoussee,iTrials) = (Variable.CyclePeak.dHand(iPoussee,iTrials)./(Variable.CyclePeak.ndHand(iPoussee,iTrials)+Variable.CyclePeak.dHand(iPoussee,iTrials)))*100;
+end
+
+
+%Symmetrie du timing de la pouss/e des mains
+% Timing D - Timing nD/Duree poussée
+
+Variable.Symmetrie.Timing=((Variable.StartPropulsion.dHand(2:NombreDePousseesMax+1,:).*(1/FzIMU)) - (Variable.StartPropulsion.ndHand(2:NombreDePousseesMax+1,:).*(1/FzIMU)))...
+    ./Variable.PushTime.IMU.AccelBased.minimum;
+
+
 
 %Ici nous retrouvons les valeurs de vitesse de ces maxs et de ces mins
 % for ivariable = 1:length(Variables)
