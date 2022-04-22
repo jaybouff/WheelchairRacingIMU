@@ -126,7 +126,9 @@ size(Variable.norme.ndHand,2);
 [Variable.maximum.pksndH, Variable.maximum.locsndH] = arrayfun(@(x) findpeaks(Variable.norme.ndHand(:,x),'MinPeakProminence',MinPeakProminenceH),...
     1:size(Variable.norme.ndHand,2),'UniformOutput',false);
 
-
+PushCyclendH = [Variable.maximum.locsndH; Variable.maximum.pksndH]; % ligne 1 = loc, ligne 2 = peaks
+%Le nombre de colonnes équivaut donc au nombre d'essais pour la ligne 1
+%(Locs) et la ligne 2 (valeur du peak)
 
 %%Préparation des différentes variables
 
@@ -158,9 +160,7 @@ Variable.Symmetrie.Timing(1:NombreDePousseesMax,1:size(PushCyclendH,2))=nan;
 %%poussées
 
 
-PushCyclendH = [Variable.maximum.locsndH; Variable.maximum.pksndH]; % ligne 1 = loc, ligne 2 = peaks
-%Le nombre de colonnes équivaut donc au nombre d'essais pour la ligne 1
-%(Locs) et la ligne 2 (valeur du peak)
+
 
 for iPushCyclendH = 1:size(PushCyclendH,2)
 
