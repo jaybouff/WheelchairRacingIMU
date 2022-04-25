@@ -2,6 +2,8 @@ close all
 clear
 clc
 
+SegmentsIMU = {'dHand','dForearm','dArm','Sternum','Frame','ndHand'};
+
 %Dans ce branching, je vais commencer par déterminer les poussées grâce a
 %l'acceleration du Frame
 
@@ -22,6 +24,7 @@ sampleminimal=tempsminimal*FzIMU;
 MinPeakProminence=0.05; %Pour le Frame
 MinPeakProminenceH=0.4; %Pour les mains
 
+DureeFenetreSynchro = 10;
 
 
 %% Aller chercher la table d'enregistrée à partir du code
@@ -50,7 +53,7 @@ end
 
 
 
-%load('Rograssine-2021-10-07-17-07-33-179.mat')
+
 
 %%Identification des variables 
 %Ici, pas besoin d'identifier chaque channel Gyro, accel, quat car ils sont
@@ -145,9 +148,50 @@ Table.Frame.Vitessexms.frotdata03LP = cumtrapz(Table.Frame.AccelX.frotdata03LP*9
 Table.Frame.Positionxms.frotdata03LP = cumtrapz(Table.Frame.Vitessexms.frotdata03LP)/(FzIMU);
 
 
-
+%% Synchronisation Science Perfo IMU
+% trouver le délai pour chaque essai
+for itrial = 1:size(Table.Frame.AccelX.frotdata03LP,2)
+    %[r,t]=xcorr(Table.Frame.AccelX.frotdata03LP(1:DureeFenetreSynchro*FzIMU,itrial),resample(Table.SciencePerfo.accelms.fdata04LP(1:DureeFenetreSynchro*FzSP,itrial),FzIMU,FzSP));
+    [r,t]=xcorr(Table.Frame.AccelX.frotdata03LP(1:DureeFenetreSynchro*FzIMU,itrial).*Table.Frame.Vitessexkmh.frotdata03LP(1:DureeFenetreSynchro*FzIMU,itrial).^2 ...
+        ,resample(Table.SciencePerfo.accelms.fdata04LP(1:DureeFenetreSynchro*FzSP,itrial).*Table.SciencePerfo.vitessekmh.fdata04LP(1:DureeFenetreSynchro*FzSP,itrial).^2,FzIMU,FzSP));
+    
+    %[r,t]=xcorr(Table.Frame.Vitessexkmh.frotdata03LP(1:DureeFenetreSynchro*FzIMU,itrial),resample(Table.SciencePerfo.vitessekmh.fdata04LP(1:DureeFenetreSynchro*FzSP,itrial),FzIMU,FzSP));
+    lag = t(r==max(r));
+    
+    if lag<0 %si le lag < 0, il faut devancer le début du signal SciencePErfo de lag
+        
+        myvar=fieldnames(Table.SciencePerfo); % On trouve tous les signaux de sciencePerfo
+        
+        for ivar=1:length(myvar)
+            
+            myprocess=fieldnames(Table.SciencePerfo.(myvar{ivar})); %Pour chaque signaux, on trouve toutes les façons qu'elles ont été process
+            
+            for iprocess=1:length(myprocess) % on applique la correction à tous les signaux et tous les signal process
+                Table.SciencePerfo.(myvar{ivar}).(myprocess{iprocess})(1:Coupure-round(abs(lag)*FzSP/FzIMU)+1,itrial)= ...
+                    Table.SciencePerfo.(myvar{ivar}).(myprocess{iprocess})(round(abs(lag)*FzSP/FzIMU):Coupure,itrial);
+            end
+        end
+        
+    elseif lag>0 %si le lag < 0, il faut devancer le début du signal IMU de lag
+        
+        for isegment = 1:length(SegmentsIMU)  % Pour tous les IMU
+            myvar=fieldnames(Table.(SegmentsIMU{isegment}));  % On trouve tous les signaux de chaque IMU
+            for ivar=1:length(myvar)
+                
+                myprocess=fieldnames(Table.SciencePerfo.(myvar{ivar})); %Pour chaque signaux, on trouve toutes les façons qu'elles ont été process
+                
+                for iprocess=1:length(myprocess) % on applique la correction à tous les signaux et tous les signal process
+                    
+                    Table.(SegmentsIMU{isegment}).(myvar{ivar}).(myprocess{iprocess})(1:length(Samplenumber)-round(abs(lag))+1,itrial)=...
+                        Table.(SegmentsIMU{isegment}).(myvar{ivar}).(myprocess{iprocess})(round(abs(lag)):end,itrial);
+                end
+            end
+        end
+        
+    end
+end
 %%
-Table.SciencePerfo.vitessekmh.fdata04LPcut = Table.SciencePerfo.vitessekmh.fdata04LP(1:700,:);
+Table.SciencePerfo.vitessekmh.fdata04LPcut = Table.SciencePerfo.vitessekmh.fdata04LP(1:Coupure,:);
 
 
 Sensor = {'SP','IMU'};
