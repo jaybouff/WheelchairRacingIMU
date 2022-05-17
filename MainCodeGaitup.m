@@ -21,7 +21,7 @@ MinimalGap = 60;
 
 TrialDuration = 20;
 
-
+Goodtrials = input('Which are the good trials for this participant (enter between [])');
 %% Filter data
 Fz=256; % fréquence d'échantillon
 Fc = [0.2, 15]; % bande passante 0.2 et 15 Hz
