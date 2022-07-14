@@ -27,9 +27,105 @@ end
 signal=decimate(signal,5);
 
    
-    identifiant_init = [1/5;find(islocalmin(signal, 1,'MinSeparation', config.min_duration*config.sFz/5,'MinProminence',config.min_peakprominence,'FlatSelection', 'first'))];
+    identifiant_init = [1;find(islocalmin(signal, 1,'MinSeparation', config.min_duration*config.sFz/5,'MinProminence',config.min_peakprominence,'FlatSelection', 'first'))];
 
    
+    
+    %% Validation and correction
+figure(2)
+clf
+plot(signal,'k')
+hold on
+
+for icycle=1:length(identifiant_init)
+        % Place the stride duration plot next to all signals
+        
+        % for each stride plot stride duration as a function of stride number
+        h(icycle)=plot(identifiant_init(icycle),signal(identifiant_init(icycle))); % should change to duration
+        hold on
+        
+        % set all strides to valid (blue)
+        set(h(icycle),'color','b','marker','o');
+        title('click in the graph to delete/add a marker, zoom in, or continue to next step')
+        
+        
+       % Wait for the most recent key to become the return/enter key   
+        
+        
+end
+
+choice =0;
+while choice ~= 1
+    [cursor,~]=ginput(1);
+    
+    % If user clicked on an an object, get its ID
+    bad = find(abs(identifiant_init-cursor)==min(abs(identifiant_init-cursor),[],'omitnan'));
+    set(h(bad),'color','r','marker','o');
+    
+    h(length(h)+1)=plot(cursor,signal(round(cursor)));
+    set(h(end),'color','g','marker','o');
+    
+    
+    choice = menu('What do you want to do', 'Stop correcting cycles','Zoom in','Delete red marker','Add green marker','Zoom out','delete many cycles');
+    
+    
+    
+ 
+
+    if choice == 2
+        
+        zoom on
+        %title('press enter when ready to continue')
+        menu('Click ok to continue','OK')
+        zoom off
+        delete(h(end))
+         set(h(bad),'color','b','marker','o');
+
+        
+     elseif choice == 3
+         delete(h(bad))
+         identifiant_init(bad)=nan;
+         delete(h(end))
+          h = h(~isnan(identifiant_init));
+
+         identifiant_init = identifiant_init (~isnan(identifiant_init));
+
+
+         
+    elseif choice == 4
+            set(h(end),'color','b','marker','o');
+                     set(h(bad),'color','b','marker','o');
+
+            identifiant_init(length(identifiant_init)+1)=cursor;
+            
+    
+    elseif choice ==5
+        zoom out
+        delete(h(end))
+                 set(h(bad),'color','b','marker','o');
+                 
+    elseif choice ==6
+        title('Place a second cursor, all markers between the red one and this cursor will be deleted');
+        [cursor2,~]=ginput(1);
+        bads = find(identifiant_init>min([cursor,cursor2])&identifiant_init<max([cursor,cursor2]));
+         identifiant_init([bad;bads])=nan;
+         delete(h(end))
+        delete(h([bad;bads]))
+        h = h(~isnan(identifiant_init));
+         identifiant_init = identifiant_init (~isnan(identifiant_init));
+         
+
+
+        
+    end
+    
+
+ 
+
+    
+end
+
+identifiant_init = sort(identifiant_init (~isnan(identifiant_init)));
     
     %% We build Cycle_Table which contains: 
     %1, beginning of the strides
@@ -47,6 +143,7 @@ for itrial = 2:length(newtrial)
     Cycle_Table(mypush,4)=itrial-1;
     Cycle_Table(mypush,5)=1:length(mypush);
 end
+
 
     myfig = figure('units','normalized','outerposition',[0 0 1 1]);
     % We show the cycle duration and ask if the user is happy
